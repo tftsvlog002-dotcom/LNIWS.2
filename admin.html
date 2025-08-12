@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Login - User Interaction Monitoring</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; background: #f7f7f7; margin: 0; }
+    .container { max-width: 400px; margin: 60px auto; background: #fff; padding: 32px 24px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);}
+    h2 { text-align: center; margin-bottom: 24px; }
+    input[type="text"], input[type="password"] { width: 100%; padding: 10px; margin-bottom: 16px; border-radius: 6px; border: 1px solid #ccc; }
+    button { width: 100%; padding: 10px; background: #007bff; color: #fff; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
+    .error { color: #d9534f; margin-bottom: 12px; text-align: center; }
+    .logout-btn { background: #dc3545; margin-top: 16px; }
+    .data-section { margin-top: 32px; }
+    .data-section h3 { margin-bottom: 8px; }
+    .data-list { background: #f8f9fa; border-radius: 8px; padding: 12px; margin-bottom: 20px; font-size: 14px; }
+    .data-list div { margin-bottom: 8px; }
+  </style>
+  <!-- Firebase scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body>
+  <div class="container" id="login-container">
+    <h2>Admin Login</h2>
+    <div id="error-msg" class="error"></div>
+    <input type="text" id="admin-username" placeholder="Username" autocomplete="username" />
+    <input type="password" id="admin-password" placeholder="Password" autocomplete="current-password" />
+    <button onclick="adminLogin()">Login</button>
+  </div>
+  <div class="container" id="admin-panel" style="display:none;">
+    <h2>Admin Panel</h2>
+    <button class="logout-btn" onclick="adminLogout()">Logout</button>
+    <div class="data-section">
+      <h3>User Comments</h3>
+      <div id="comments-list" class="data-list"></div>
+      <h3>User Ratings</h3>
+      <div id="ratings-list" class="data-list"></div>
+      <h3>User Photos</h3>
+      <div id="photos-list" class="data-list"></div>
+    </div>
+  </div>
+  <script>
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://lniws-79c82-default-rtdb.firebaseio.com/",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Simple admin credentials (change these for production)
+    const ADMIN_USER = "admin";
+    const ADMIN_PASS = "123louigie456";
+
+    function adminLogin() {
+      const user = document.getElementById('admin-username').value.trim();
+      const pass = document.getElementById('admin-password').value;
+      if (user === ADMIN_USER && pass === ADMIN_PASS) {
+        document.getElementById('login-container').style.display = 'none';
+        document.getElementById('admin-panel').style.display = 'block';
+        loadUserData();
+      } else {
+        document.getElementById('error-msg').textContent = "Invalid credentials!";
+      }
+    }
+
+    function adminLogout() {
+      document.getElementById('admin-panel').style.display = 'none';
+      document.getElementById('login-container').style.display = 'block';
+      document.getElementById('admin-username').value = '';
+      document.getElementById('admin-password').value = '';
+      document.getElementById('error-msg').textContent = '';
+    }
+
+    function loadUserData() {
+      // Comments
+      db.ref('comments').once('value', snapshot => {
+        const commentsDiv = document.getElementById('comments-list');
+        commentsDiv.innerHTML = '';
+        const data = snapshot.val();
+        if (data) {
+          Object.keys(data).forEach(pinId => {
+            Object.values(data[pinId]).forEach(comment => {
+              commentsDiv.innerHTML += `<div><b>${pinId}:</b> ${comment.text} <span style="color:#888;">(${new Date(comment.timestamp).toLocaleString()})</span></div>`;
+            });
+          });
+        } else {
+          commentsDiv.innerHTML = '<div>No comments yet.</div>';
+        }
+      });
+      // Ratings
+      db.ref('ratings').once('value', snapshot => {
+        const ratingsDiv = document.getElementById('ratings-list');
+        ratingsDiv.innerHTML = '';
+        const data = snapshot.val();
+        if (data) {
+          Object.keys(data).forEach(pinId => {
+            Object.values(data[pinId]).forEach(rating => {
+              ratingsDiv.innerHTML += `<div><b>${pinId}:</b> ${rating.value} star(s) <span style="color:#888;">(${new Date(rating.timestamp).toLocaleString()})</span></div>`;
+            });
+          });
+        } else {
+          ratingsDiv.innerHTML = '<div>No ratings yet.</div>';
+        }
+      });
+      // Photos
+      db.ref('photos').once('value', snapshot => {
+        const photosDiv = document.getElementById('photos-list');
+        photosDiv.innerHTML = '';
+        const data = snapshot.val();
+        if (data) {
+          Object.keys(data).forEach(pinId => {
+            Object.values(data[pinId]).forEach(photo => {
+              photosDiv.innerHTML += `<div><b>${pinId}:</b><br><img src="${photo.image}" style="width:80px;height:80px;border-radius:8px;border:1px solid #ccc;object-fit:cover;margin-top:4px;" /><br><span style="color:#888;">${new Date(photo.timestamp).toLocaleString()}</span></div>`;
+            });
+          });
+        } else {
+          photosDiv.innerHTML = '<div>No photos yet.</div>';
+        }
+      });
+    }
+  </script>
+</body>
+</html>

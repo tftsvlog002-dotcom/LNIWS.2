@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Lubang Ship Tracker + JNK Pin</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    body { margin: 0; }
+    #map { height: 100vh; width: 100vw; }
+
+    .popup-card {
+      width: 170px;
+      height: 300px;
+      perspective: 1000px;
+    }
+
+    .card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.8s;
+      transform-style: preserve-3d;
+    }
+
+    .popup-card:hover .card-inner {
+      transform: rotateY(180deg);
+    }
+
+    .card-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 24px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      backface-visibility: hidden;
+      overflow: hidden;
+    }
+
+    .card-front {
+      background: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .card-front img {
+      width: 100%;
+      height: auto;
+    }
+
+    .card-back {
+      background: #f2f2f2;
+      transform: rotateY(180deg);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .card-back a {
+      text-decoration: none;
+      color: #1877f2;
+      font-weight: bold;
+      font-family: sans-serif;
+    }
+
+    #pinCategorySelect {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<select id="pinCategorySelect">
+  <option value="all">Show All Pins</option>
+  <option value="none">Hide All Pins</option>
+  <option value="jnk">JNK</option>
+  <option value="school">School</option>
+  <option value="government">Government</option>
+  <option value="church">Church</option>
+  <option value="residence">Residence</option>
+  <option value="landmarks">Landmarks</option>
+  <option value="other">Other</option>
+</select>
+<!-- Add Admin Login button below the dropdown -->
+<button id="adminLoginBtn" style="position:absolute;top:50px;right:10px;z-index:1000;padding:8px 12px;background:#28a745;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;">Admin Login</button>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+  // ROUTES
+  const route1 = [
+    [13.8607365, 120.1189033],
+    [13.875279, 120.096573],
+    [13.864428, 120.065927],
+    [13.857952, 120.045196],
+    [13.870028, 120.031315],
+    [13.876014, 120.034958]
+  ];
+
+  const route2 = [
+    [14.082136, 120.616347],
+    [13.950000, 120.500000],
+    [13.870000, 120.300000],
+    [13.8157035, 120.2005297]
+  ];
+
+  const map = L.map('map', {
+    zoom: 10,
+    minZoom: 10
+  });
+
+  map.fitBounds([
+    [13.740, 119.950],
+    [13.970, 120.250]
+  ]);
+
+  const bounds = L.latLngBounds(
+    [13.560046, 119.850202],
+    [14.100000, 120.700000]
+  );
+  map.setMaxBounds(bounds);
+  map.on('drag', () => map.panInsideBounds(bounds, { animate: false }));
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  L.polyline(route1, { color: 'navy', weight: 4, dashArray: '8,8' }).addTo(map);
+  L.polyline(route2, { color: 'green', weight: 4, dashArray: '8,8' }).addTo(map);
+
+  // 🚢 SHIPS
+  const shipIcon = L.icon({
+    iconUrl: 'ship.png',
+    iconSize: [40, 40],
+    iconAnchor: [20, 20]
+  });
+
+  const ship1 = L.marker(route1[0], { icon: shipIcon }).addTo(map);
+  const ship2 = L.marker(route2[0], { icon: shipIcon }).addTo(map);
+
+  function animateShip(route, ship, speed = 0.005, delay = 20) {
+    let segment = 0;
+    let t = 0;
+
+    function interpolate(start, end, t) {
+      return [
+        start[0] + (end[0] - start[0]) * t,
+        start[1] + (end[1] - start[1]) * t
+      ];
+    }
+
+    function move() {
+      if (segment >= route.length - 1) {
+        segment = 0;
+        t = 0;
+      }
+
+      const start = route[segment];
+      const end = route[segment + 1];
+      const pos = interpolate(start, end, t);
+      ship.setLatLng(pos);
+
+      t += speed;
+      if (t >= 1) {
+        t = 0;
+        segment++;
+      }
+
+      setTimeout(move, delay);
+    }
+
+    move();
+  }
+
+  animateShip(route1, ship1);
+  animateShip(route2, ship2);
+
+  // 📍 RED PINS
+  const redPinIcon = L.icon({
+    iconUrl: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+    iconSize: [32, 32],
+    iconAnchor: [16, 32]
+  });
+
+  // Pin data with classification and unique image for each pin
+  const pinData = [
+    {
+      latlng: [13.856069, 120.122459],
+      category: 'jnk',
+      iconUrl: 'Store1.png',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="JNK.jpg" alt="JNK" />
+            </div>
+            <div class="card-face card-back">
+              <a href="https://web.facebook.com/profile.php?id=61572021585621" target="_blank">
+                Visit our Facebook Page 📱
+              </a>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      latlng: [13.775518, 120.120446],
+      category: 'jnk',
+      iconUrl: 'JNK.jpg',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="JNK.jpg" alt="JNK" />
+            </div>
+            <div class="card-face card-back">
+              <a href="https://web.facebook.com/profile.php?id=61572021585621" target="_blank">
+                Visit our Facebook Page 📱
+              </a>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      latlng: [13.784902, 120.117769],
+      category: 'other',
+      iconUrl: 'JNK.jpg',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="JNK.jpg" alt="JNK" />
+            </div>
+            <div class="card-face card-back">
+              <a href="https://web.facebook.com/profile.php?id=61572021585621" target="_blank">
+                Visit our Facebook Page 📱
+              </a>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      latlng: [13.846992, 120.120008], // example coordinates for school
+      category: 'school',
+      iconUrl: 'omsc.png',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="omscamp.png" alt="School" />
+            </div>
+            <div class="card-face card-back">
+              <a href="https://web.facebook.com/tin.campus" target="_blank">
+                Visit our Facebook Page 📱
+              </a>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      latlng: [13.781226, 120.116754], // example coordinates for Binacas
+      category: 'school',
+      iconUrl: 'binacas.png',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="binacas.png" alt="Binacas School" />
+            </div>
+            <div class="card-face card-back">
+              <span>Binacas School 🏫</span>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      latlng: [13.853242, 120.122236], // example coordinates for LIS
+      category: 'school',
+      iconUrl: 'lis.png',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="lis.png" alt="LIS School" />
+            </div>
+            <div class="card-face card-back">
+              <span>LIS School 🏫</span>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      latlng: [13.859560, 120.123667], // example coordinates for Stella Maris
+      category: 'school',
+      iconUrl: 'stellamaris.png',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="stellamaris.png" alt="Stella Maris School" />
+            </div>
+            <div class="card-face card-back">
+              <span>Stella Maris School 🏫</span>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      latlng: [13.857235, 120.130884], // Maligaya School
+      category: 'school',
+      iconUrl: 'maligaya.png',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="maligaya.png" alt="Maligaya School" />
+            </div>
+            <div class="card-face card-back">
+              <span>Maligaya School 🏫</span>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      latlng: [13.857222, 120.120833], // Lubang Municipal Hall location
+      category: 'government',
+      iconUrl: 'lubang-municipal-hall.png',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="lubang-municipal-hall.png" alt="Lubang Municipal Hall" />
+            </div>
+            <div class="card-face card-back">
+              <span>Lubang Municipal Hall<br>
+                <img src="https://user-images.githubusercontent.com/6756943/282140099-2e9b1c6c-7b7d-4c3e-8e1e-7e2b6c2b7b5a.jpg" alt="Lubang Seal" style="width:60px;height:60px;border-radius:50%;margin-top:8px;">
+              </span>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      latlng: [13.859478, 120.123089], // Our Lady Of Assumption Parish
+      category: 'church',
+      iconUrl: 'assumption-parish.png',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="assumption-parish.png" alt="Our Lady Of Assumption Parish" />
+            </div>
+            <div class="card-face card-back">
+              <span>Our Lady Of Assumption Parish ⛪</span>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      latlng: [13.858429, 120.128318], // Divinagracia Residence
+      category: 'residence',
+      iconUrl: 'divinagracia.png',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="divinagracia.png" alt="Divinagracia Residence" />
+            </div>
+            <div class="card-face card-back">
+              <span>Divinagracia Residence<br>"BOSS MANUEL"</span>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      latlng: [13.857854, 120.127722], // Iglesia ni Cristo
+      category: 'church',
+      iconUrl: 'iglesia-ni-cristo.png',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="iglesia-ni-cristo.png" alt="Iglesia ni Cristo" />
+            </div>
+            <div class="card-face card-back">
+              <span>Iglesia ni Cristo ⛪</span>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      latlng: [13.858289, 120.128539], // Brgy. Maligaya Hall
+      category: 'government',
+      iconUrl: 'maligaya-hall.png',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="maligaya-hall.png" alt="Brgy. Maligaya Hall" />
+            </div>
+            <div class="card-face card-back">
+              <span>Brgy. Maligaya Hall 🏛️</span>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      latlng: [13.840241, 120.087656], // Tagbac Barangay Hall
+      category: 'government',
+      iconUrl: 'tagbac-hall.png',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="tagbac-hall.png" alt="Tagbac Barangay Hall" />
+            </div>
+            <div class="card-face card-back">
+              <span>Tagbac Barangay Hall 🏛️</span>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      latlng: [13.777376, 120.118748], // Barangay Binacas
+      category: 'government',
+      iconUrl: 'binacas-hall.png',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="binacas-hall.png" alt="Barangay Binacas Hall" />
+            </div>
+            <div class="card-face card-back">
+              <span>Barangay Binacas Hall 🏛️</span>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      latlng: [13.775156, 120.121327], // Binacas Picnic Grove
+      category: 'landmarks',
+      iconUrl: 'binacas-grove.png',
+      popup: `
+        <div class="popup-card">
+          <div class="card-inner">
+            <div class="card-face card-front">
+              <img src="binacas-grove.png" alt="Binacas Picnic Grove" />
+            </div>
+            <div class="card-face card-back">
+              <span>Binacas Picnic Grove 🏞️</span>
+            </div>
+          </div>
+        </div>
+      `
+    }
+  ];
+
+  // Create markers from pinData, each with a circular image icon
+  const pinMarkers = pinData.map((data, idx) => {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="
+        width:40px;height:40px;
+        border-radius:50%;
+        overflow:hidden;
+        border:3px solid #fff;
+        box-shadow:0 2px 8px rgba(0,0,0,0.3);
+        background:#fff;
+        display:flex;align-items:center;justify-content:center;
+      ">
+        <img src="${data.iconUrl}" style="width:100%;height:100%;object-fit:cover;"/>
+      </div>`,
+      iconSize: [40, 40],
+      iconAnchor: [20, 40]
+    });
+
+    // Unique popup id for feedback and photo sharing
+    const popupId = `popup-${idx}`;
+
+    // Add share photo, star feedback, and comment box to popup HTML
+    const popupContent = `
+      ${data.popup}
+      <div style="margin-top:10px;">
+        <button onclick="document.getElementById('photo-input-${popupId}').click()" style="padding:6px 12px;border-radius:8px;border:none;background:#007bff;color:#fff;cursor:pointer;">Share a Photo 📷</button>
+        <input type="file" id="photo-input-${popupId}" style="display:none;" accept="image/*" onchange="handlePhotoShare(event, '${popupId}')">
+        <div id="photo-preview-${popupId}" style="margin-top:8px;"></div>
+        <div style="margin-top:10px;">
+          <span>Rate this place:</span>
+          <span id="stars-${popupId}" style="font-size:22px;cursor:pointer;">
+            <span onclick="setStarRating('${popupId}',1)">&#9734;</span>
+            <span onclick="setStarRating('${popupId}',2)">&#9734;</span>
+            <span onclick="setStarRating('${popupId}',3)">&#9734;</span>
+            <span onclick="setStarRating('${popupId}',4)">&#9734;</span>
+            <span onclick="setStarRating('${popupId}',5)">&#9734;</span>
+          </span>
+          <span id="star-feedback-${popupId}" style="margin-left:8px;color:#f39c12;"></span>
+        </div>
+        <div style="margin-top:10px;">
+          <textarea id="comment-box-${popupId}" rows="2" style="width:95%;border-radius:8px;border:1px solid #ccc;padding:6px;font-size:14px;" placeholder="Leave a comment..."></textarea>
+          <button onclick="submitComment('${popupId}')" style="margin-top:6px;padding:5px 10px;border-radius:8px;border:none;background:#28a745;color:#fff;cursor:pointer;">Submit</button>
+          <div id="comment-list-${popupId}" style="margin-top:8px;font-size:13px;"></div>
+        </div>
+      </div>
+    `;
+
+    const marker = L.marker(data.latlng, { icon });
+    const popup = L.popup({
+      closeButton: false,
+      offset: L.point(0, -28),
+      autoClose: true,
+      closeOnClick: true,
+      className: 'jnk-popup'
+    }).setContent(popupContent);
+    marker.bindPopup(popup);
+
+    // Show popup on hover (desktop)
+    marker.on('mouseover', () => marker.openPopup());
+    marker.on('mouseout', (e) => {
+      setTimeout(() => {
+        const popupEl = document.querySelector('.leaflet-popup');
+        if (popupEl && popupEl.matches(':hover')) return;
+        marker.closePopup();
+      }, 100);
+    });
+    marker.on('click', (e) => {
+      marker.openPopup();
+      e.originalEvent.stopPropagation();
+    });
+
+    marker.category = data.category;
+    return marker;
+  });
+
+  // Close all popups when clicking/tapping outside the map or any popup
+  document.addEventListener('click', function (e) {
+    const mapEl = document.getElementById('map');
+    const popupEl = document.querySelector('.leaflet-popup');
+    if (
+      !mapEl.contains(e.target) &&
+      (!popupEl || !popupEl.contains(e.target))
+    ) {
+      pinMarkers.forEach(marker => marker.closePopup());
+    }
+  });
+
+  // Also close popups when clicking on the map background (not on a marker)
+  map.on('click', function () {
+    pinMarkers.forEach(marker => marker.closePopup());
+  });
+
+  let currentCategory = 'all';
+
+  // Show all pins on first load
+  window.addEventListener('DOMContentLoaded', () => {
+    updatePinsVisibility();
+  });
+
+  function updatePinsVisibility() {
+    pinMarkers.forEach(marker => {
+      let match = false;
+      if (currentCategory === 'all') {
+        match = true;
+      } else if (currentCategory === 'none') {
+        match = false;
+      } else {
+        match = marker.category === currentCategory;
+      }
+      if (match) {
+        marker.addTo(map);
+      } else {
+        map.removeLayer(marker);
+      }
+    });
+  }
+
+  document.getElementById('pinCategorySelect').addEventListener('change', (e) => {
+    currentCategory = e.target.value;
+    updatePinsVisibility();
+  });
+
+  document.getElementById('adminLoginBtn').addEventListener('click', function() {
+    window.location.href = 'admin.html';
+  });
+
+  // --- Add global JS for photo sharing, star feedback, and comment box ---
+  window.handlePhotoShare = function(event, popupId) {
+    const input = event.target;
+    const previewDiv = document.getElementById(`photo-preview-${popupId}`);
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        previewDiv.innerHTML = `<img src="${e.target.result}" style="width:100px;height:100px;border-radius:12px;object-fit:cover;border:2px solid #007bff;" alt="Shared Photo"/>`;
+      };
+      reader.readAsDataURL(input.files[0]);
+    }
+  };
+
+  window.setStarRating = function(popupId, rating) {
+    const starsSpan = document.getElementById(`stars-${popupId}`);
+    const feedbackSpan = document.getElementById(`star-feedback-${popupId}`);
+    if (!starsSpan) return;
+    let starsHtml = '';
+    for (let i = 1; i <= 5; i++) {
+      starsHtml += `<span onclick="setStarRating('${popupId}',${i})">${i <= rating ? '&#9733;' : '&#9734;'}</span>`;
+    }
+    starsSpan.innerHTML = starsHtml;
+    feedbackSpan.textContent = `You rated ${rating} star${rating > 1 ? 's' : ''}!`;
+  };
+
+  window.submitComment = function(popupId) {
+    const textarea = document.getElementById(`comment-box-${popupId}`);
+    const commentList = document.getElementById(`comment-list-${popupId}`);
+    const comment = textarea.value.trim();
+    if (comment) {
+      const div = document.createElement('div');
+      div.textContent = comment;
+      div.style.marginBottom = '4px';
+      div.style.background = '#f8f9fa';
+      div.style.padding = '4px 8px';
+      div.style.borderRadius = '6px';
+      commentList.appendChild(div);
+      textarea.value = '';
+    }
+  };
+</script>
+
+</body>
+</html>

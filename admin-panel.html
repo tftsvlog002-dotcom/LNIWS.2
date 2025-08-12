@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Panel - User Dashboard</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; background: #f7f7f7; margin: 0; }
+    .container { max-width: 800px; margin: 40px auto; background: #fff; padding: 32px 24px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);}
+    h2 { text-align: center; margin-bottom: 24px; }
+    .section { margin-bottom: 32px; }
+    .section h3 { margin-bottom: 8px; }
+    .data-list { background: #f8f9fa; border-radius: 8px; padding: 12px; margin-bottom: 20px; font-size: 14px; }
+    .data-list div { margin-bottom: 8px; }
+    .star { color: #f39c12; font-size: 18px; }
+    .pin-title { font-weight: bold; }
+    .logout-btn { background: #dc3545; margin-bottom: 24px; padding: 8px 16px; border-radius: 8px; border: none; color: #fff; cursor: pointer; }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body>
+  <div class="container">
+    <button class="logout-btn" onclick="window.location.href='index.html'">Logout</button>
+    <h2>Admin Dashboard</h2>
+    <div class="section">
+      <h3>Latest Comments</h3>
+      <div id="latest-comments" class="data-list"></div>
+    </div>
+    <div class="section">
+      <h3>Top 5 Pins (Highest 5-Star Ratings)</h3>
+      <div id="top-pins" class="data-list"></div>
+    </div>
+  </div>
+  <script>
+    // Firebase config (same as your main config)
+    const firebaseConfig = {
+      apiKey: "AIzaSyBru43uggU-YLevZ7mv2rp3EKXGKNR_i1Q",
+      authDomain: "getoe-9f34f.firebaseapp.com",
+      projectId: "getoe-9f34f",
+      storageBucket: "getoe-9f34f.firebasestorage.app",
+      messagingSenderId: "770333082221",
+      appId: "1:770333082221:web:e95a23d0e804e7b1feb564",
+      measurementId: "G-TV5CWWF9KH",
+      databaseURL: "https://lniws-79c82-default-rtdb.firebaseio.com/"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Show latest comments (sorted by timestamp desc, limit 10)
+    db.ref('comments').once('value', snapshot => {
+      const commentsDiv = document.getElementById('latest-comments');
+      let commentsArr = [];
+      const data = snapshot.val();
+      if (data) {
+        Object.keys(data).forEach(pinId => {
+          Object.values(data[pinId]).forEach(comment => {
+            commentsArr.push({
+              pinId,
+              text: comment.text,
+              timestamp: comment.timestamp
+            });
+          });
+        });
+        commentsArr.sort((a, b) => b.timestamp - a.timestamp);
+        commentsArr.slice(0, 10).forEach(c => {
+          commentsDiv.innerHTML += `<div><span class="pin-title">${c.pinId}:</span> ${c.text} <span style="color:#888;">(${new Date(c.timestamp).toLocaleString()})</span></div>`;
+        });
+      } else {
+        commentsDiv.innerHTML = '<div>No comments yet.</div>';
+      }
+    });
+
+    // Show top 5 pins with most 5-star ratings
+    db.ref('ratings').once('value', snapshot => {
+      const topPinsDiv = document.getElementById('top-pins');
+      const data = snapshot.val();
+      let pinStars = {};
+      if (data) {
+        Object.keys(data).forEach(pinId => {
+          let fiveStarCount = 0;
+          Object.values(data[pinId]).forEach(rating => {
+            if (rating.value === 5) fiveStarCount++;
+          });
+          pinStars[pinId] = fiveStarCount;
+        });
+        // Sort pins by 5-star count desc
+        const sorted = Object.entries(pinStars).sort((a, b) => b[1] - a[1]);
+        sorted.slice(0, 5).forEach(([pinId, count]) => {
+          topPinsDiv.innerHTML += `<div><span class="pin-title">${pinId}</span> <span class="star">&#9733;</span> x ${count}</div>`;
+        });
+        if (sorted.length === 0) {
+          topPinsDiv.innerHTML = '<div>No 5-star ratings yet.</div>';
+        }
+      } else {
+        topPinsDiv.innerHTML = '<div>No ratings yet.</div>';
+      }
+    });
+  </script>
+</body>
+</html>
