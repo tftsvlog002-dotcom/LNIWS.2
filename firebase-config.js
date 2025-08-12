@@ -13,8 +13,8 @@ const firebaseConfig = {
   projectId: "getoe-9f34f",
   storageBucket: "getoe-9f34f.firebasestorage.app",
   messagingSenderId: "770333082221",
-  appId: "1:770333082221:web:e95a23d0e804e7b1feb564",
-  measurementId: "G-TV5CWWF9KH"
+  appId: "1:770333082221:web:dfdeebbed43e6494feb564",
+  measurementId: "G-Q4GDQDV8VE"
 };
 
 // Initialize Firebase
